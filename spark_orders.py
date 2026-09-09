@@ -1,12 +1,12 @@
 # spark_orders.py
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Bài thực hành PySpark: xử lý dữ liệu đơn hàng (orders)
 # Flow: tạo/đọc dữ liệu -> xử lý bằng Spark (select/filter/groupBy + SQL) -> ghi kết quả
 #
 # Toàn bộ output chỉ ghi ra CSV (không dùng Parquet). Mỗi "bảng" kết quả được
 # ghi ra ĐÚNG 1 file .csv riêng trong thư mục output/ (không phải thư mục con
 # nhiều file part- như Spark mặc định) để dễ xem, dễ push lên git.
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 import glob
 import os
