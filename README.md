@@ -1,6 +1,6 @@
 # Bài thực hành PySpark: Xử lý dữ liệu đơn hàng 
 
-Flow tổng quát: **dạng ETL**.
+Flow tổng quát: **dạng ETL**
 
 ## Cấu trúc project
 
