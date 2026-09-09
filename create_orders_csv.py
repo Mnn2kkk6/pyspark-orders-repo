@@ -1,5 +1,5 @@
 # create_orders_csv.py
-# Mục đích: sinh ra file orders.csv mẫu để bước sau PySpark đọc vào xử lý.
+# Mục đích: sinh ra file orders.csv mẫu để bước sau PySpark đọc vào xử lý
 # Đây KHÔNG phải là Spark, chỉ là bước chuẩn bị dữ liệu đầu vào bằng Python thuần.
 
 import csv
