@@ -1,0 +1,30 @@
+# docker-compose.yml
+# ---------------------------------------------------------------------------
+# Chạy MinIO (S3-compatible object storage) local để thực hành upload
+# Bronze/Silver/Gold lên "cloud storage" giả lập ngay trên máy.
+#
+# Cách chạy:   docker compose up -d
+# Console web: http://localhost:9001  (đăng nhập bằng MINIO_ROOT_USER / MINIO_ROOT_PASSWORD)
+# API endpoint : http://localhost:9000
+# ---------------------------------------------------------------------------
+services:
+  minio:
+    image: minio/minio:latest
+    container_name: minio-lakehouse
+    ports:
+      - "9000:9000"   # API endpoint  - code/mc CLI kết nối vào đây
+      - "9001:9001"   # Web console - mở trình duyệt vào đây để xem trực quan
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  minio_data:
