@@ -350,3 +350,109 @@ docker compose down -v       # dừng container VÀ xóa luôn dữ liệu (volu
 - Bronze giữ nguyên dữ liệu dạng chữ, chưa ép kiểu số/ngày, để tránh làm mất hoặc sai lệch dữ liệu lỗi ngay từ đầu.
 - Silver và Gold không giữ cột `source_file`, `load_time` vì đó chỉ là thông tin phục vụ debug, không phải dữ liệu nghiệp vụ.
 - MinIO dùng để giả lập kho lưu trữ đám mây (như S3), giúp luyện tập upload/tổ chức dữ liệu mà không cần tài khoản cloud thật.
+
+
+---
+
+# Phần 3: Airflow điều phối + khái niệm Iceberg/Nessie/Data Catalog
+
+Nối tiếp Phần 2 (Bronze/Silver/Gold + MinIO), phần này thêm **Airflow** vào flow
+để hiểu vai trò của một **orchestrator** (công cụ điều phối), và giới thiệu khái
+niệm về Iceberg/Nessie/Data Catalog — 3 mảnh ghép để dữ liệu trên
+lake trở thành "table" có version, có schema tra cứu được.
+
+```
+source CSV → Spark xử lý Bronze/Silver/Gold → MinIO lưu dữ liệu
+                        ▲
+                        │  điều phối (chạy đúng thứ tự, đúng lịch)
+                    Airflow
+                        │ 
+                Iceberg/Nessie/Data Catalog
+              quản lý table/metadata trên lake
+```
+
+## File mới thêm vào repo (Phần 3)
+
+```
+pyspark-orders-repo/
+└── dags/
+    └── bronze_silver_gold_dag.py   # DAG Airflow: 3 task bronze -> silver -> gold
+```
+
+`docker-compose.yml` được cập nhật thêm service `airflow` ,chạy Airflow ở chế độ
+`standalone` — 1 container duy nhất gồm cả webserver, scheduler, DB sqlite;
+ **không dùng cấu hình này cho production**.
+
+## DAG: `bronze_silver_gold_dag.py`
+
+- 3 task: `bronze_task`, `silver_task`, `gold_task`, mỗi task dùng `PythonOperator`
+  gọi 1 hàm chỉ `print()` ra bước đang chạy — **CHƯA gọi thật** `bronze_layer.py` /
+  `silver_layer.py` / `gold_layer.py` của Phần 2.
+- Dependency: `bronze_task >> silver_task >> gold_task` — silver chỉ chạy sau khi
+  bronze **thành công**, gold chờ silver, đúng thứ tự flow Lakehouse thực tế.
+- `schedule=None`: DAG không tự chạy theo lịch, chỉ trigger thủ công trên UI .
+
+Đã test bằng Airflow CLI thật (`airflow tasks test ... bronze_task ...`) — cả 3
+task chạy đúng, in đúng nội dung `Running Bronze layer` / `Running Silver layer` /
+`Running Gold layer`, Airflow tự đánh dấu SUCCESS.
+
+## Cách chạy Airflow UI
+
+```bash
+docker compose up -d
+```
+
+Chờ để Airflow khởi tạo xong, rồi:
+
+1. Mở **http://localhost:8080**
+2. Đăng nhập user `admin`, lấy password bằng 1 trong 2 cách:
+   ```bash
+   docker compose logs airflow | grep "Password for user"
+   ```
+   hoặc đọc trực tiếp file password Airflow tự sinh ra trong container:
+   ```bash
+   docker compose exec airflow cat /opt/airflow/standalone_admin_password.txt
+   ```
+3. Trên UI, tìm DAG tên **`bronze_silver_gold_dag`** trong danh sách.
+4. Bật DAG (gạt toggle ở đầu dòng từ tắt sang bật).
+5. Bấm nút ▶ (Trigger DAG) để chạy thử.
+6. Vào Graph View, thấy đúng thứ tự 3 ô vuông nối tiếp: `bronze_task → silver_task → gold_task`.
+7. Bấm vào từng task → tab **Logs** → xem đúng dòng `Running Bronze layer` /
+   `Running Silver layer` / `Running Gold layer` đã in ra.
+
+### Windows (PowerShell)
+
+```powershell
+cd đường-dẫn-tới\pyspark-orders-repo
+docker compose up -d
+docker compose logs airflow | Select-String "Password for user"
+```
+Mở trình duyệt http://localhost:8080, đăng nhập, làm các bước 3–7 ở trên.
+
+## Ghi chú: vai trò của Airflow trong flow
+
+> **Airflow không xử lý dữ liệu trực tiếp như Spark.** Spark là nơi dữ liệu THỰC SỰ
+> được đọc/biến đổi/ghi (filter, groupBy, cast kiểu...). Airflow chỉ đóng vai trò
+> **điều phối (orchestrate)** — quyết định: bước nào chạy trước, bước nào chạy sau,
+> chạy lúc mấy giờ (schedule), nếu 1 bước lỗi thì có retry không, và cho phép xem
+> lại log/trạng thái từng lần chạy trên 1 giao diện tập trung.
+
+
+## Khái niệm: Iceberg / Nessie / Data Catalog
+
+
+| Thành phần | Vai trò |
+|---|---|
+| **Spark** | Công cụ xử lý dữ liệu — đọc, biến đổi (filter/groupBy/join...), ghi dữ liệu. |
+| **MinIO** | Nơi LƯU FILE vật lý (S3-compatible object storage) — chỉ biết "có file gì trong bucket", không biết file đó là 1 "bảng dữ liệu" có schema/lịch sử thay đổi. |
+| **Iceberg** | Table format — biến 1 tập hợp file rời rạc trên MinIO thành 1 **"table"** có schema rõ ràng, hỗ trợ time travel (xem lại dữ liệu ở phiên bản cũ), cập nhật/xóa dòng dữ liệu (điều mà file CSV/Parquet thô không tự làm được). |
+| **Nessie** | Catalog quản lý **version** của các Iceberg table — giống git nhưng cho dữ liệu: có thể tạo branch, commit thay đổi, rollback về version cũ của cả 1 tập hợp table. |
+| **Data Catalog** | Nơi trả lời câu hỏi "hệ thống đang có những dataset/table nào, schema ra sao, nằm ở đâu" — giúp người dùng/công cụ khác (BI tool, data scientist) tìm và hiểu dữ liệu mà không cần hỏi trực tiếp đội kỹ thuật. |
+
+**Cách các mảnh khớp lại với nhau** :
+Thay vì Gold layer ghi CSV thô ra MinIO như hiện tại, ta sẽ ghi qua **Iceberg** —
+lúc đó `gold/order_summary` không còn là "1 file CSV" nữa mà là 1 table thật sự
+. **Nessie** đứng ra quản lý version của table đó. Và toàn bộ danh sách table + schema của chúng được đăng ký vào 
+**Data Catalog** để các công cụ khác tra cứu được — đây chính là điểm khác biệt giữa
+"data lake" (chỉ có file) và "**lakehouse**" (có file + có tính chất của table
+trong database).
