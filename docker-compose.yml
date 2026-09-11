@@ -33,10 +33,10 @@ services:
     ports:
       - "8080:8080"   # Airflow web UI
     environment:
-      AIRFLOW__CORE__LOAD_EXAMPLES: "false"   # tắt các DAG mẫu có sẵn cho đỡ rối UI
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"   # tắt các DAG mẫu có sẵn cho đỡ rối đến UI
       # KHÔNG set AIRFLOW__CORE__EXECUTOR ở đây: chế độ "standalone" mặc định
       # dùng SQLite + SequentialExecutor. Ép LocalExecutor sẽ lỗi vì SQLite
-      # không hỗ trợ LocalExecutor (cần Postgres/MySQL cho LocalExecutor).
+      # không hỗ trợ LocalExecutor .
     volumes:
       - ./dags:/opt/airflow/dags             # map thư mục dags/ trong repo vào Airflow
       - airflow_data:/opt/airflow             # giữ lại DB/log giữa các lần restart container
