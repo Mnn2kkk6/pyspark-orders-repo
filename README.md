@@ -431,7 +431,7 @@ Mở trình duyệt http://localhost:8080, đăng nhập, làm các bước 3–
 
 ## Ghi chú: vai trò của Airflow trong flow
 
-> **Airflow không xử lý dữ liệu trực tiếp như Spark.** Spark là nơi dữ liệu THỰC SỰ
+> **Airflow không xử lý dữ liệu trực tiếp như Spark.** Spark là nơi dữ liệu thực sự
 > được đọc/biến đổi/ghi (filter, groupBy, cast kiểu...). Airflow chỉ đóng vai trò
 > **điều phối (orchestrate)** — quyết định: bước nào chạy trước, bước nào chạy sau,
 > chạy lúc mấy giờ (schedule), nếu 1 bước lỗi thì có retry không, và cho phép xem
