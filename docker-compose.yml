@@ -12,7 +12,7 @@ services:
     image: minio/minio:latest
     container_name: minio-lakehouse
     ports:
-      - "9000:9000"   # API endpoint  - code/mc CLI kết nối vào đây
+      - "9000:9000"   # API endpoint - code/mc CLI kết nối vào đây
       - "9001:9001"   # Web console - mở trình duyệt vào đây để xem trực quan
     environment:
       MINIO_ROOT_USER: minioadmin
@@ -26,5 +26,23 @@ services:
       timeout: 5s
       retries: 5
 
+  airflow:
+    image: apache/airflow:2.9.3
+    container_name: airflow-lakehouse
+    restart: unless-stopped
+    ports:
+      - "8080:8080"   # Airflow web UI
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"   # tắt các DAG mẫu có sẵn cho đỡ rối UI
+      # KHÔNG set AIRFLOW__CORE__EXECUTOR ở đây: chế độ "standalone" mặc định
+      # dùng SQLite + SequentialExecutor. Ép LocalExecutor sẽ lỗi vì SQLite
+      # không hỗ trợ LocalExecutor (cần Postgres/MySQL cho LocalExecutor).
+    volumes:
+      - ./dags:/opt/airflow/dags             # map thư mục dags/ trong repo vào Airflow
+      - airflow_data:/opt/airflow             # giữ lại DB/log giữa các lần restart container
+    # "standalone" tự động: khởi tạo DB, tạo user admin, chạy webserver + scheduler
+    command: standalone
+
 volumes:
   minio_data:
+  airflow_data:
